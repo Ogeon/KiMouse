@@ -15,3 +15,16 @@
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <stdio.h>
+#include <libfreenect.h>
+
+
+uint16_t *depthBack, *depthMid, *depthFront;
+int depthReceived;
+
+int main(int argc, char **argv){
+    printf("hello kinect!\n");
+
+    return 0;
+}

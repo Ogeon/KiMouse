@@ -13,9 +13,9 @@ OFLAGS = -c
 EFLAGS =
 
 #### BUILD COMMANDS ####
-#Build .o-file
+#Build .o-file:
 OBUILD = $(CC) $(CFLAGS) $(OFLAGS) $(INCLUDES)
-#Build binary
+#Build binary:
 BBUILD = $(CC) $(CFLAGS) $(EFLAGS) $(LINKS) $(OBJECTS)
 
 
