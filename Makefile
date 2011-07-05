@@ -1,7 +1,7 @@
 OBJECTS = build/main.o
 CC = gcc
-INCLUDES = -Ilibs/libfreenect/include
-LINKS = -lfreenect
+INCLUDES = -Ilibs/libfreenect/include -Ilibs/glfw/include
+LINKS = -lfreenect -lGL -lGLU libs/glfw/lib/x11/libglfw.a
 
 #### FLAGS ####
 #Allways provided:
@@ -17,7 +17,7 @@ EFLAGS =
 #Build .o-file:
 OBUILD = $(CC) $(CFLAGS) $(OFLAGS) $(INCLUDES)
 #Build binary:
-BBUILD = $(CC) $(CFLAGS) $(EFLAGS) $(LINKS) $(OBJECTS)
+BBUILD = $(CC) $(CFLAGS) $(EFLAGS) $(OBJECTS) $(LINKS)
 
 
 #### TARGETS ####
