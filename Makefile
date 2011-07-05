@@ -1,7 +1,7 @@
 OBJECTS = build/main.o
 CC = gcc
 INCLUDES = -Ilibs/libfreenect/include -Ilibs/glfw/include
-LINKS = -lfreenect -lGL -lGLU libs/glfw/lib/x11/libglfw.a
+LINKS = -lfreenect -lGL -lGLU -lm libs/glfw/lib/x11/libglfw.a
 
 #### FLAGS ####
 #Allways provided:

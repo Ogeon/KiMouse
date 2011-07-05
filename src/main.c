@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <math.h>
 
 #include <pthread.h>
 
@@ -26,6 +27,8 @@
 #include <GL/glu.h>
 #include <GL/glfw.h>
 
+
+#define PI	3.1415
 
 freenect_context *f_ctx;
 freenect_device *f_dev;
@@ -38,6 +41,8 @@ uint16_t *depthBack, *depthMid, *depthFront;
 int depthReceived;
 int running;
 int cameraAngle;
+
+int windowWidth, windowHeight;
 
 void* processLoop(void* arg){
 	while(running == 1){
@@ -63,22 +68,78 @@ void initGL(){
 }
 
 void resizeGL(int width, int height){
-	if (height == 0) //Prevent divide by 0
+	if(height == 0) //Prevent divide by 0
 		height = 1;
-
+	if(width == 0)
+		width = 1;
+		
+	if((float)width/(float)height > 640.0f/480.0f){
+		windowWidth = ((float)width/(float)height) * 480;
+		windowHeight = 480;
+	}else{
+		windowWidth = 640;
+		windowHeight = ((float)height/(float)width) * 640;
+	}
+	
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-
 	glViewport(0, 0, width, height);
-
-	gluPerspective(45.0f, (float) width / (float) height, 1.0f, 1000.0f);
-
+	glOrtho (0, windowWidth, windowHeight, 0, -1.0f, 1.0f);
 	glMatrixMode(GL_MODELVIEW); // Select The Modelview Matrix
 	glLoadIdentity();
 }
 
 void redraw(){
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glLoadIdentity();
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glBegin(GL_QUADS);
+	glVertex2f(windowWidth/2 - 320, windowHeight/2 - 240);
+	glVertex2f(windowWidth/2, windowHeight/2 - 240);
+	glVertex2f(windowWidth/2, windowHeight/2);
+	glVertex2f(windowWidth/2 - 320, windowHeight/2);
 	
+	
+	glVertex2f(windowWidth/2 + 320, windowHeight/2 + 240);
+	glVertex2f(windowWidth/2, windowHeight/2 + 240);
+	glVertex2f(windowWidth/2, windowHeight/2);
+	glVertex2f(windowWidth/2 + 320, windowHeight/2);
+	glEnd();
+	
+	//Draw tilt range background
+	glColor4f(.3f, 1.0f, .3f, .5f);
+	glBegin(GL_TRIANGLE_FAN);
+	glVertex2f(10.0f, 40.0f);
+	int angle;
+	for(angle = -30; angle <= 30; angle+=10){
+		glVertex2f(
+		    10.0f + cos(angle/180.f * PI) * 50.0f,
+		    40.0f + sin(angle/180.f * PI) * 50.0f);
+	}
+	glEnd();
+	//Draw tilt range ticks
+	glColor3f(.3f, 1.0f, .3f);
+	glBegin(GL_LINES);
+	glVertex2f(10.0f, 40.0f);
+	glVertex2f(
+	    10.0f + cos(30.f/180.f * PI) * 55.0f,
+	    40.0f + sin(30.f/180.f * PI) * 55.0f);
+	glVertex2f(10.0f, 40.0f);
+	glVertex2f(
+	    10.0f + cos(-30.f/180.f * PI) * 55.0f,
+	    40.0f + sin(-30.f/180.f * PI) * 55.0f);
+	glVertex2f(10.0f, 40.0f);
+	glVertex2f(65.0f, 40.0f);
+	glEnd();
+	
+	//Draw camera angle
+	glColor3f(1.0f, .3f, .3f);
+	glBegin(GL_LINES);
+	glVertex2f(10.0f, 40.0f);
+	glVertex2f(
+	    10.0f + cos(cameraAngle/180.f * PI) * 50.0f,
+	    40.0f - sin(cameraAngle/180.f * PI) * 50.0f);
+	glEnd();
 	glfwSwapBuffers();
 }
 
