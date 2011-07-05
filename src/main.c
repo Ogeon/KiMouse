@@ -37,6 +37,7 @@ pthread_cond_t gl_frame_cond = PTHREAD_COND_INITIALIZER;
 uint16_t *depthBack, *depthMid, *depthFront;
 int depthReceived;
 int running;
+int cameraAngle;
 
 void* processLoop(void* arg){
 	while(running == 1){
@@ -77,7 +78,8 @@ void resizeGL(int width, int height){
 }
 
 void redraw(){
-	printf("running = %d\n", running);
+	
+	glfwSwapBuffers();
 }
 
 int main(int argc, char **argv){
@@ -108,11 +110,11 @@ int main(int argc, char **argv){
 	}
 	printf("\33[2K\rDevice number %d is now connected\n", user_device_number+1);
 	freenect_set_led(f_dev,LED_GREEN);
-	freenect_set_tilt_degs(f_dev, -30);
-	sleep(2);
-	printf("\nHello!\n");
+	freenect_set_tilt_degs(f_dev, -5);
+	sleep(1);
+	printf("\nHello!\n\n");
 	freenect_set_tilt_degs(f_dev, 0);
-	sleep(2);
+	sleep(1);
 	freenect_set_led(f_dev,LED_RED);
 	//freenect_set_depth_callback(f_dev, depth_cb);
 	freenect_set_depth_mode(f_dev,
@@ -151,13 +153,27 @@ int main(int argc, char **argv){
 	}
 	glfwSetWindowTitle("KiMouse");
 	glfwSetWindowSizeCallback(resizeGL);
-	printf("\33[2K\rGLFW window is open");
+	printf("\33[2K\rGLFW window is open\n");
 	
 	initGL();
-
+	
+	cameraAngle = 0;
+	int angleCount = 0;
 	while(running){
 		redraw();
-		
+		if(++angleCount > 10){
+			if(glfwGetKey(GLFW_KEY_UP) && cameraAngle < 30){
+				cameraAngle ++;
+			}
+			if(glfwGetKey(GLFW_KEY_SPACE)){
+				cameraAngle = 0;
+			}
+			if(glfwGetKey(GLFW_KEY_DOWN) && cameraAngle > -30){
+				cameraAngle --;
+			}
+			freenect_set_tilt_degs(f_dev, cameraAngle);
+			angleCount = 0;
+		}
 		running = !glfwGetKey( GLFW_KEY_ESC ) &&
 		    glfwGetWindowParam( GLFW_OPENED );
 	}
