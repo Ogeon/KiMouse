@@ -19,12 +19,17 @@
 #include <stdio.h>
 #include <libfreenect.h>
 
+freenect_context *f_ctx;
+freenect_device *f_dev;
 
 uint16_t *depthBack, *depthMid, *depthFront;
 int depthReceived;
 
 int main(int argc, char **argv){
-    printf("hello kinect!\n");
-
-    return 0;
+	printf("hello kinect!\n");
+	if (freenect_init(&f_ctx, NULL) < 0) {
+		printf("freenect_init() failed\n");
+		return 1;
+	}
+	return 0;
 }

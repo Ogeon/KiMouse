@@ -1,6 +1,7 @@
 OBJECTS = build/main.o
 CC = gcc
 INCLUDES = -Ilibs/libfreenect/include
+LINKS = -lfreenect
 
 #### FLAGS ####
 #Allways provided:
