@@ -26,10 +26,46 @@ uint16_t *depthBack, *depthMid, *depthFront;
 int depthReceived;
 
 int main(int argc, char **argv){
-	printf("hello kinect!\n");
+	printf("Init freenect...");
 	if (freenect_init(&f_ctx, NULL) < 0) {
-		printf("freenect_init() failed\n");
+		printf("\nfreenect_init() failed!\n");
 		return 1;
 	}
+	freenect_set_log_level(f_ctx, FREENECT_LOG_DEBUG);
+
+	printf("\33[2K\rInit freenect done\n");
+
+	printf("Searching for devices...");
+	int nr_devices = freenect_num_devices (f_ctx);
+	printf ("\33[2K\rNumber of devices found: %d\n",  nr_devices);
+
+	int user_device_number = 0;
+
+	if (nr_devices < 1){
+		printf("Please connect a device before running KiMouse!\n");
+		return 1;
+	}
+
+	printf("Connecting to device number %d... ", user_device_number+1);
+	if (freenect_open_device(f_ctx, &f_dev, user_device_number) < 0) {
+		printf("\rCould not open device number %d!\n", user_device_number+1);
+		return 1;
+	}
+	printf("\33[2K\rDevice number %d is now connected\n", user_device_number+1);
+
+	
+
+	printf("\nShutting down...\n");
+	fflush(stdout);
+
+	freenect_set_led(f_dev,LED_BLINK_GREEN);
+	freenect_set_tilt_degs(f_dev, 0);
+
+	freenect_stop_depth(f_dev);
+
+	freenect_close_device(f_dev);
+	freenect_shutdown(f_ctx);
+
+	printf("KTHXBYE!\n");	
 	return 0;
 }
