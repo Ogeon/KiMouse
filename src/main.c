@@ -17,6 +17,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
 
@@ -27,8 +28,10 @@
 #include <GL/glu.h>
 #include <GL/glfw.h>
 
+#include "imageOperations.h"
 
-#define PI	3.1415
+#define PI					3.1415
+#define FREENECT_FRAME_PIX	640*480
 
 freenect_context *f_ctx;
 freenect_device *f_dev;
@@ -38,6 +41,10 @@ pthread_mutex_t gl_backbuf_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t gl_frame_cond = PTHREAD_COND_INITIALIZER;
 
 uint16_t *depthBack, *depthMid, *depthFront;
+uint8_t *depthRGBBack, *depthRGBFront;
+
+GLuint glDepthTex;
+
 int depthReceived;
 int running;
 int cameraAngle;
@@ -45,10 +52,44 @@ int cameraAngle;
 int windowWidth, windowHeight;
 
 void* processLoop(void* arg){
-	while(running == 1){
+	while(running == 1 && freenect_process_events(f_ctx) >= 0){
 		
 	}
 	return NULL;
+}
+
+void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
+	int i;
+    depthBack = (uint16_t*)v_depth;
+    pthread_mutex_lock(&gl_backbuf_mutex);
+
+    uint16_t d_min = 2047;
+    uint16_t d_max = 0;
+    
+    printf("Processing depth image...");
+    
+    for (i=0; i<FREENECT_FRAME_PIX; i++) {
+        if(depthBack[i] < 2047){
+            d_min = fmin(d_min, depthBack[i]);
+            d_max = fmax(d_max, depthBack[i]);
+        }
+    }
+
+    for (i=0; i<FREENECT_FRAME_PIX; i++) {
+        int lum = 0;
+        if(depthBack[i] < 2047)
+            lum = (int)(255-(depthBack[i] - d_min)/((float)d_max - d_min) * 255);
+
+        depthRGBBack[3*i+0] = lum;
+        depthRGBBack[3*i+1] = lum;
+        depthRGBBack[3*i+2] = lum;
+    }
+    
+    printf("[DONE]\n");
+    
+    depthReceived++;
+    pthread_cond_signal(&gl_frame_cond);
+    pthread_mutex_unlock(&gl_backbuf_mutex);
 }
 
 void initGL(){
@@ -59,12 +100,13 @@ void initGL(){
 	glEnable(GL_BLEND);
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glShadeModel(GL_SMOOTH);
-	//glGenTextures(1, &gl_depth_tex);
-	//glBindTexture(GL_TEXTURE_2D, gl_depth_tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenTextures(1, &glDepthTex);
+	glBindTexture(GL_TEXTURE_2D, glDepthTex);
+	glEnable(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
 void resizeGL(int width, int height){
@@ -90,28 +132,38 @@ void resizeGL(int width, int height){
 }
 
 void redraw(){
+	pthread_mutex_unlock(&gl_backbuf_mutex);
+
+	uint8_t *tmp;
+
+	if (depthReceived) {
+		tmp = depthRGBFront;
+		depthRGBFront = depthRGBBack;
+		depthRGBBack = tmp;
+		depthReceived = 0;
+	}
+	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 	glColor3f(1.0f, 1.0f, 1.0f);
+	
+	glBindTexture(GL_TEXTURE_2D, glDepthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, 3, 640, 480, 0, GL_RGB, GL_UNSIGNED_BYTE, depthRGBFront);
+	
 	glBegin(GL_QUADS);
-	glVertex2f(windowWidth/2 - 320, windowHeight/2 - 240);
-	glVertex2f(windowWidth/2, windowHeight/2 - 240);
-	glVertex2f(windowWidth/2, windowHeight/2);
-	glVertex2f(windowWidth/2 - 320, windowHeight/2);
-	
-	
-	glVertex2f(windowWidth/2 + 320, windowHeight/2 + 240);
-	glVertex2f(windowWidth/2, windowHeight/2 + 240);
-	glVertex2f(windowWidth/2, windowHeight/2);
-	glVertex2f(windowWidth/2 + 320, windowHeight/2);
+	glTexCoord2f(0, 0); glVertex2f(windowWidth/2 - 320, windowHeight/2 - 240);
+	glTexCoord2f(1, 0); glVertex2f(windowWidth/2 + 320, windowHeight/2 - 240);
+	glTexCoord2f(1, 1); glVertex2f(windowWidth/2 + 320, windowHeight/2 + 240);
+	glTexCoord2f(0, 1); glVertex2f(windowWidth/2 - 320, windowHeight/2 + 240);
 	glEnd();
 	
+	glBindTexture(GL_TEXTURE_2D, 0);
 	//Draw tilt range background
 	glColor4f(.3f, 1.0f, .3f, .5f);
 	glBegin(GL_TRIANGLE_FAN);
 	glVertex2f(10.0f, 40.0f);
 	int angle;
-	for(angle = -30; angle <= 30; angle+=10){
+	for(angle = -30; angle <= 30; angle+=15){
 		glVertex2f(
 		    10.0f + cos(angle/180.f * PI) * 50.0f,
 		    40.0f + sin(angle/180.f * PI) * 50.0f);
@@ -141,6 +193,23 @@ void redraw(){
 	    40.0f - sin(cameraAngle/180.f * PI) * 50.0f);
 	glEnd();
 	glfwSwapBuffers();
+}
+
+static void tiltCamera(){
+	static int angleCount = 0;
+	if(++angleCount > 10){
+		if(glfwGetKey(GLFW_KEY_UP) && cameraAngle < 30){
+			cameraAngle ++;
+		}
+		if(glfwGetKey(GLFW_KEY_SPACE)){
+			cameraAngle = 0;
+		}
+		if(glfwGetKey(GLFW_KEY_DOWN) && cameraAngle > -30){
+			cameraAngle --;
+		}
+		freenect_set_tilt_degs(f_dev, cameraAngle);
+		angleCount = 0;
+	}
 }
 
 int main(int argc, char **argv){
@@ -173,16 +242,22 @@ int main(int argc, char **argv){
 	freenect_set_led(f_dev,LED_GREEN);
 	freenect_set_tilt_degs(f_dev, -5);
 	sleep(1);
+	
 	printf("\nHello!\n\n");
 	freenect_set_tilt_degs(f_dev, 0);
 	sleep(1);
+	
+	depthRGBBack = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
+	depthRGBFront = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
+	
 	freenect_set_led(f_dev,LED_RED);
-	//freenect_set_depth_callback(f_dev, depth_cb);
+	freenect_set_depth_callback(f_dev, depthCB);
 	freenect_set_depth_mode(f_dev,
 	    freenect_find_depth_mode(
 	        FREENECT_RESOLUTION_MEDIUM,
 	        FREENECT_DEPTH_11BIT)
 	    );
+	freenect_start_depth(f_dev);
 		
 	running = 1;
 	
@@ -219,22 +294,9 @@ int main(int argc, char **argv){
 	initGL();
 	
 	cameraAngle = 0;
-	int angleCount = 0;
 	while(running){
 		redraw();
-		if(++angleCount > 10){
-			if(glfwGetKey(GLFW_KEY_UP) && cameraAngle < 30){
-				cameraAngle ++;
-			}
-			if(glfwGetKey(GLFW_KEY_SPACE)){
-				cameraAngle = 0;
-			}
-			if(glfwGetKey(GLFW_KEY_DOWN) && cameraAngle > -30){
-				cameraAngle --;
-			}
-			freenect_set_tilt_degs(f_dev, cameraAngle);
-			angleCount = 0;
-		}
+		tiltCamera();
 		running = !glfwGetKey( GLFW_KEY_ESC ) &&
 		    glfwGetWindowParam( GLFW_OPENED );
 	}
@@ -250,8 +312,11 @@ int main(int argc, char **argv){
 
 	freenect_close_device(f_dev);
 	freenect_shutdown(f_ctx);
+	
+	free(depthRGBBack);
+	free(depthRGBFront);
 
-	printf("KTHXBYE!\n");	
+	//printf("KTHXBYE!\n");
 	return 0;
 }
 
