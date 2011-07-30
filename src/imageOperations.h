@@ -1,5 +1,5 @@
 /*
- * imageOperations.c
+ * imageOperations.h
  * Copyright (C) Erik Hedvall 2011 <admin@ogeon.se>
  *
  * kimouse is free software: you can redistribute it and/or modify it
@@ -15,8 +15,10 @@
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+#include <stdint.h>
 
-void laplace(uint16_t *source, char *dest, uint16_t treshold);
+void laplace(uint16_t* source, char* dest, uint16_t treshold);
 
 void thinning(char *img);
 

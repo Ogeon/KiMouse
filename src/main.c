@@ -40,20 +40,42 @@ pthread_t processThread;
 pthread_mutex_t gl_backbuf_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t gl_frame_cond = PTHREAD_COND_INITIALIZER;
 
-uint16_t *depthBack, *depthMid, *depthFront;
+uint16_t *depthBack, *depthFront, *depthReject;
 uint8_t *depthRGBBack, *depthRGBFront;
+char *depthBool;
 
 GLuint glDepthTex;
 
 int depthReceived;
+int depthRGBReceived;
+
 int running;
 int cameraAngle;
 
 int windowWidth, windowHeight;
 
+
+void resetBackground(){
+	int i;
+	for (i=0; i<FREENECT_FRAME_PIX; i++) {
+		depthReject[i] = 0;
+	}
+}
+
 void* processLoop(void* arg){
 	while(running == 1 && freenect_process_events(f_ctx) >= 0){
+		if(glfwGetKey('B')){
+			resetBackground();
+		}
 		
+		if(depthReceived){
+			uint16_t* tmp = depthBack;
+			depthBack = depthFront;
+			depthFront = tmp;
+			depthReceived = 0;
+			
+			laplace(depthFront, depthBool, 30);
+		}
 	}
 	return NULL;
 }
@@ -66,12 +88,15 @@ void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
     uint16_t d_min = 2047;
     uint16_t d_max = 0;
     
-    printf("Processing depth image...");
-    
     for (i=0; i<FREENECT_FRAME_PIX; i++) {
         if(depthBack[i] < 2047){
             d_min = fmin(d_min, depthBack[i]);
             d_max = fmax(d_max, depthBack[i]);
+        }
+        
+        if((depthReject[i] == 0 && depthBack[i] == 2047) ||
+            (depthBack[i] > depthReject[i] && depthBack[i] != 2047)){
+        	depthReject[i] = depthBack[i];
         }
     }
 
@@ -81,13 +106,16 @@ void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
             lum = (int)(255-(depthBack[i] - d_min)/((float)d_max - d_min) * 255);
 
         depthRGBBack[3*i+0] = lum;
-        depthRGBBack[3*i+1] = lum;
-        depthRGBBack[3*i+2] = lum;
+        depthRGBBack[3*i+1] = abs(depthBack[i] - depthReject[i]) > 10? lum: 0;
+        depthRGBBack[3*i+2] = abs(depthBack[i] - depthReject[i]) > 10? lum: 0;
+        
+        if(abs(depthBack[i] - depthReject[i]) <= 10){
+        	depthBack[i] = 2047;
+        }
     }
     
-    printf("[DONE]\n");
-    
     depthReceived++;
+    depthRGBReceived++;
     pthread_cond_signal(&gl_frame_cond);
     pthread_mutex_unlock(&gl_backbuf_mutex);
 }
@@ -136,11 +164,11 @@ void redraw(){
 
 	uint8_t *tmp;
 
-	if (depthReceived) {
+	if (depthRGBReceived) {
 		tmp = depthRGBFront;
 		depthRGBFront = depthRGBBack;
 		depthRGBBack = tmp;
-		depthReceived = 0;
+		depthRGBReceived = 0;
 	}
 	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -151,15 +179,15 @@ void redraw(){
     glTexImage2D(GL_TEXTURE_2D, 0, 3, 640, 480, 0, GL_RGB, GL_UNSIGNED_BYTE, depthRGBFront);
 	
 	glBegin(GL_QUADS);
-	glTexCoord2f(0, 0); glVertex2f(windowWidth/2 - 320, windowHeight/2 - 240);
-	glTexCoord2f(1, 0); glVertex2f(windowWidth/2 + 320, windowHeight/2 - 240);
-	glTexCoord2f(1, 1); glVertex2f(windowWidth/2 + 320, windowHeight/2 + 240);
-	glTexCoord2f(0, 1); glVertex2f(windowWidth/2 - 320, windowHeight/2 + 240);
+	glTexCoord2f(1, 0); glVertex2f(windowWidth/2 - 320, windowHeight/2 - 240);
+	glTexCoord2f(0, 0); glVertex2f(windowWidth/2 + 320, windowHeight/2 - 240);
+	glTexCoord2f(0, 1); glVertex2f(windowWidth/2 + 320, windowHeight/2 + 240);
+	glTexCoord2f(1, 1); glVertex2f(windowWidth/2 - 320, windowHeight/2 + 240);
 	glEnd();
 	
 	glBindTexture(GL_TEXTURE_2D, 0);
 	//Draw tilt range background
-	glColor4f(.3f, 1.0f, .3f, .5f);
+	glColor3f(.3f, 1.0f, .3f);
 	glBegin(GL_TRIANGLE_FAN);
 	glVertex2f(10.0f, 40.0f);
 	int angle;
@@ -247,8 +275,14 @@ int main(int argc, char **argv){
 	freenect_set_tilt_degs(f_dev, 0);
 	sleep(1);
 	
+	depthRGBReceived = 0;
+	depthReceived = 0;
+	
 	depthRGBBack = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
 	depthRGBFront = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
+	depthReject = (uint16_t*)malloc(FREENECT_FRAME_PIX * sizeof(uint16_t));
+	resetBackground();
+	depthBool = (char*)malloc(FREENECT_FRAME_PIX);
 	
 	freenect_set_led(f_dev,LED_RED);
 	freenect_set_depth_callback(f_dev, depthCB);
@@ -305,18 +339,24 @@ int main(int argc, char **argv){
 	printf("\nShutting down...\n");
 	fflush(stdout);
 
+	printf("Reseting camera...\n");
 	freenect_set_led(f_dev,LED_BLINK_GREEN);
 	freenect_set_tilt_degs(f_dev, 0);
 
+	printf("Halting depth capture...\n");
 	freenect_stop_depth(f_dev);
 
+	printf("Disconnecting camera...\n");
 	freenect_close_device(f_dev);
 	freenect_shutdown(f_ctx);
 	
+	printf("Freeing resources...\n");
 	free(depthRGBBack);
 	free(depthRGBFront);
+	free(depthReject);
+	free(depthBool);
 
-	//printf("KTHXBYE!\n");
+	printf("Shutdown completed!\n\nKTHXBYE!\n");
 	return 0;
 }
 

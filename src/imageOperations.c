@@ -1,5 +1,5 @@
 /*
- * imageOperations.h
+ * imageOperations.c
  * Copyright (C) Erik Hedvall 2011 <admin@ogeon.se>
  *
  * kimouse is free software: you can redistribute it and/or modify it
@@ -15,8 +15,18 @@
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+#include "imageOperations.h"
 
-void laplace(uint16_t *source, char *dest, uint16_t treshold){
+#include <stdlib.h>
+#include <stdint.h>
+#include <math.h>
+
+#define FREENECT_FRAME_PIX	640*480
+#define FREENECT_FRAME_W	640
+#define FREENECT_FRAME_H	480
+
+void laplace(uint16_t* source, char* dest, uint16_t treshold){
     int x, y;
     int w = FREENECT_FRAME_W;
     int h = FREENECT_FRAME_H;
