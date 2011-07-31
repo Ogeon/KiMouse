@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
+#include <string.h>
 
 #include <pthread.h>
 
@@ -54,6 +55,8 @@ int cameraAngle;
 
 int windowWidth, windowHeight;
 
+int viewMode;
+
 
 void resetBackground(){
 	int i;
@@ -68,13 +71,32 @@ void* processLoop(void* arg){
 			resetBackground();
 		}
 		
+		if(glfwGetKey('1')){
+			viewMode = 0;
+		}
+		if(glfwGetKey('2')){
+			viewMode = 1;
+		}
+		
 		if(depthReceived){
 			uint16_t* tmp = depthBack;
 			depthBack = depthFront;
 			depthFront = tmp;
 			depthReceived = 0;
 			
-			laplace(depthFront, depthBool, 30);
+			laplace(depthFront, depthBool, 10);
+			if(viewMode == 1){
+				pthread_mutex_lock(&gl_backbuf_mutex);
+				int i;
+				for (i=0; i<FREENECT_FRAME_PIX; i++) {
+					depthRGBBack[3*i+0] = depthBool[i];
+					depthRGBBack[3*i+1] = depthBool[i];
+					depthRGBBack[3*i+2] = depthBool[i];
+				}
+    			depthRGBReceived++;
+    			pthread_cond_signal(&gl_frame_cond);
+    			pthread_mutex_unlock(&gl_backbuf_mutex);
+			}
 		}
 	}
 	return NULL;
@@ -82,8 +104,10 @@ void* processLoop(void* arg){
 
 void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
 	int i;
+	//free(depthBack);
     depthBack = (uint16_t*)v_depth;
-    pthread_mutex_lock(&gl_backbuf_mutex);
+    if(viewMode == 0)
+    	pthread_mutex_lock(&gl_backbuf_mutex);
 
     uint16_t d_min = 2047;
     uint16_t d_max = 0;
@@ -104,10 +128,12 @@ void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
         int lum = 0;
         if(depthBack[i] < 2047)
             lum = (int)(255-(depthBack[i] - d_min)/((float)d_max - d_min) * 255);
-
-        depthRGBBack[3*i+0] = lum;
-        depthRGBBack[3*i+1] = abs(depthBack[i] - depthReject[i]) > 10? lum: 0;
-        depthRGBBack[3*i+2] = abs(depthBack[i] - depthReject[i]) > 10? lum: 0;
+		
+		if(viewMode == 0){
+        	depthRGBBack[3*i+0] = lum;
+        	depthRGBBack[3*i+1] = abs(depthBack[i] - depthReject[i]) > 10? lum: 0;
+        	depthRGBBack[3*i+2] = abs(depthBack[i] - depthReject[i]) > 10? lum: 0;
+        }
         
         if(abs(depthBack[i] - depthReject[i]) <= 10){
         	depthBack[i] = 2047;
@@ -115,9 +141,12 @@ void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
     }
     
     depthReceived++;
-    depthRGBReceived++;
-    pthread_cond_signal(&gl_frame_cond);
-    pthread_mutex_unlock(&gl_backbuf_mutex);
+    
+    if(viewMode == 0){
+    	depthRGBReceived++;
+    	pthread_cond_signal(&gl_frame_cond);
+    	pthread_mutex_unlock(&gl_backbuf_mutex);
+	}
 }
 
 void initGL(){
@@ -160,7 +189,7 @@ void resizeGL(int width, int height){
 }
 
 void redraw(){
-	pthread_mutex_unlock(&gl_backbuf_mutex);
+	pthread_mutex_lock(&gl_backbuf_mutex);
 
 	uint8_t *tmp;
 
@@ -170,6 +199,8 @@ void redraw(){
 		depthRGBBack = tmp;
 		depthRGBReceived = 0;
 	}
+	
+	pthread_mutex_unlock(&gl_backbuf_mutex);
 	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
@@ -241,12 +272,35 @@ static void tiltCamera(){
 }
 
 int main(int argc, char **argv){
+	char verbose = 0;
+	if(argc > 1){
+		int i;
+		for(i = 1; i < argc; i++){
+			if(strcmp("--help", argv[i]) || strcmp("-h", argv[i])){
+				printf("\n--KiMouse--\n");
+				printf("Hand gesture based human-computer interface using a ");
+				printf("Microsoft Kinect and libfreenect.\n\n");
+				printf("Running the program:\n\tkimouse [flags]\n\n");
+				printf("Flags:\n");
+				printf("--help, -h\n\tShow this help text.\n\n");
+				printf("--verbose, -v\n\tShow debug information from libfreenect.\n\n");
+				exit(0);
+			}
+			if(strcmp("--verbose", argv[i]) || strcmp("-v", argv[i])){
+				verbose = 1;
+			}
+		}
+	}
+
 	printf("Init freenect...");
 	if (freenect_init(&f_ctx, NULL) < 0) {
 		printf("\n\tfreenect_init() failed!\n");
 		return 1;
 	}
-	freenect_set_log_level(f_ctx, FREENECT_LOG_DEBUG);
+	
+	if(verbose){
+		freenect_set_log_level(f_ctx, FREENECT_LOG_DEBUG);
+	}
 
 	printf("\33[2K\rInit freenect done\n");
 
@@ -277,6 +331,7 @@ int main(int argc, char **argv){
 	
 	depthRGBReceived = 0;
 	depthReceived = 0;
+	viewMode = 0;
 	
 	depthRGBBack = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
 	depthRGBFront = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
