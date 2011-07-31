@@ -71,21 +71,42 @@ void* processLoop(void* arg){
 			resetBackground();
 		}
 		
+		//Change view mode
 		if(glfwGetKey('1')){
 			viewMode = 0;
 		}
 		if(glfwGetKey('2')){
 			viewMode = 1;
 		}
+		if(glfwGetKey('3')){
+			viewMode = 2;
+		}
 		
 		if(depthReceived){
+			//Swap buffers
 			uint16_t* tmp = depthBack;
 			depthBack = depthFront;
 			depthFront = tmp;
 			depthReceived = 0;
 			
+			//Laplace filter the depth view and update texture
 			laplace(depthFront, depthBool, 10);
 			if(viewMode == 1){
+				pthread_mutex_lock(&gl_backbuf_mutex);
+				int i;
+				for (i=0; i<FREENECT_FRAME_PIX; i++) {
+					depthRGBBack[3*i+0] = depthBool[i];
+					depthRGBBack[3*i+1] = depthBool[i];
+					depthRGBBack[3*i+2] = depthBool[i];
+				}
+    			depthRGBReceived++;
+    			pthread_cond_signal(&gl_frame_cond);
+    			pthread_mutex_unlock(&gl_backbuf_mutex);
+			}
+			
+			//Thin shapes to get lines and update texture
+			thinning(depthBool);
+			if(viewMode == 2){
 				pthread_mutex_lock(&gl_backbuf_mutex);
 				int i;
 				for (i=0; i<FREENECT_FRAME_PIX; i++) {
@@ -104,7 +125,7 @@ void* processLoop(void* arg){
 
 void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
 	int i;
-	//free(depthBack);
+	
     depthBack = (uint16_t*)v_depth;
     if(viewMode == 0)
     	pthread_mutex_lock(&gl_backbuf_mutex);
@@ -113,11 +134,13 @@ void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
     uint16_t d_max = 0;
     
     for (i=0; i<FREENECT_FRAME_PIX; i++) {
-        if(depthBack[i] < 2047){
+    	//Get min-depth and max-depth
+        if(depthBack[i] < 2047 && viewMode == 0){
             d_min = fmin(d_min, depthBack[i]);
             d_max = fmax(d_max, depthBack[i]);
         }
         
+        //Update background depth
         if((depthReject[i] == 0 && depthBack[i] == 2047) ||
             (depthBack[i] > depthReject[i] && depthBack[i] != 2047)){
         	depthReject[i] = depthBack[i];
@@ -125,16 +148,17 @@ void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
     }
 
     for (i=0; i<FREENECT_FRAME_PIX; i++) {
-        int lum = 0;
-        if(depthBack[i] < 2047)
-            lum = (int)(255-(depthBack[i] - d_min)/((float)d_max - d_min) * 255);
-		
+		//Update view-texture
 		if(viewMode == 0){
+        	int lum = 0;
+        	if(depthBack[i] < 2047)
+            	lum = (int)(255-(depthBack[i] - d_min)/((float)d_max - d_min) * 255);
         	depthRGBBack[3*i+0] = lum;
         	depthRGBBack[3*i+1] = abs(depthBack[i] - depthReject[i]) > 10? lum: 0;
         	depthRGBBack[3*i+2] = abs(depthBack[i] - depthReject[i]) > 10? lum: 0;
         }
         
+        //Subtract background
         if(abs(depthBack[i] - depthReject[i]) <= 10){
         	depthBack[i] = 2047;
         }
@@ -167,6 +191,7 @@ void initGL(){
 }
 
 void resizeGL(int width, int height){
+	//Adjust size of camera-view
 	if(height == 0) //Prevent divide by 0
 		height = 1;
 	if(width == 0)
@@ -180,6 +205,7 @@ void resizeGL(int width, int height){
 		windowHeight = ((float)height/(float)width) * 640;
 	}
 	
+	//GL stuff
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glViewport(0, 0, width, height);
@@ -193,6 +219,7 @@ void redraw(){
 
 	uint8_t *tmp;
 
+	//Swap texture-buffers
 	if (depthRGBReceived) {
 		tmp = depthRGBFront;
 		depthRGBFront = depthRGBBack;
@@ -206,6 +233,7 @@ void redraw(){
 	glLoadIdentity();
 	glColor3f(1.0f, 1.0f, 1.0f);
 	
+	//Draw camera view
 	glBindTexture(GL_TEXTURE_2D, glDepthTex);
     glTexImage2D(GL_TEXTURE_2D, 0, 3, 640, 480, 0, GL_RGB, GL_UNSIGNED_BYTE, depthRGBFront);
 	

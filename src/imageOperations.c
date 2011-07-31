@@ -76,6 +76,12 @@ void thinning(char *img){
 
     int* limits = calloc(sizeof(int), 2*h);
     int* tmp_limits = calloc(sizeof(int), 2*h);
+    
+    char delete = -3;
+    
+	int a, b, n, v;
+	int p[8];
+    
     for(y = 0; y < h; y++){
         tmp_limits[2*y] = 0;
         tmp_limits[2*y+1] = w;
@@ -94,21 +100,26 @@ void thinning(char *img){
 
         for(y = 0; y < h; y++){
             for(x = limits[2*y]; x < limits[2*y+1]+1; x++){
-                if(img[y * w + x] != 0){
-                    int a = 0, b = 0, n;
-                    int p[8];
+            	if(img[y * w + x] == delete){
+            		img[y * w + x] = 0;
+                }else if(img[y * w + x] != 0){
+                    a = 0;
+                    b = 0;
 
                     if(y > 0){
-                        p[0] = (img[(y-1) * w + x] != 0)?1:0;
+                    	v = img[(y-1) * w + x];
+                        p[0] = (v != 0 && v != delete)?1:0;
 
                         if(x > 0){
-                            p[7] = (img[(y-1) * w + x-1] != 0)?1:0;
+                        	v = img[(y-1) * w + x-1];
+                            p[7] = (v != 0 && v != delete)?1:0;
                         }else{
                             p[7] = 0;
                         }
 
                         if(x < w-1){
-                            p[1] = (img[(y-1) * w + x+1] != 0)?1:0;
+                        	v = img[(y-1) * w + x+1];
+                            p[1] = (v != 0 && v != delete)?1:0;
                         }else{
                             p[1] = 0;
                         }
@@ -119,16 +130,19 @@ void thinning(char *img){
                     }
 
                     if(y < h-1){
-                        p[4] = (img[(y+1) * w + x] != 0)?1:0;
+                    	v = img[(y+1) * w + x];
+                        p[4] = (v != 0 && v != delete)?1:0;
 
                         if(x > 0){
-                            p[5] = (img[(y+1) * w + x-1] != 0)?1:0;
+                        	v = img[(y+1) * w + x-1];
+                            p[5] = (v != 0 && v != delete)?1:0;
                         }else{
                             p[5] = 0;
                         }
 
                         if(x < w-1){
-                            p[3] = (img[(y+1) * w + x+1] != 0)?1:0;
+                        	v = img[(y+1) * w + x+1];
+                            p[3] = (v != 0 && v != delete)?1:0;
                         }else{
                             p[3] = 0;
                         }
@@ -139,13 +153,15 @@ void thinning(char *img){
                     }
 
                     if(x > 0){
-                        p[6] = (img[y * w + x-1] != 0)?1:0;
+                    	v = img[y * w + x-1];
+                        p[6] = (v != 0 && v != delete)?1:0;
                     }else{
                         p[6] = 0;
                     }
 
                     if(x < w-1){
-                        p[2] = (img[y * w + x+1] != 0)?1:0;
+                    	v = img[y * w + x+1];
+                        p[2] = (v != 0 && v != delete)?1:0;
                     }else{
                         p[2] = 0;
                     }
@@ -157,40 +173,33 @@ void thinning(char *img){
                             a++;
                     }
 
-                    //printf("a=%d, b=%d\n", a, b);
                     if(pass == 0){
                         if(a == 1 && b >= 4 && b <= 7 && p[0]*p[2]*p[4] == 0 && p[2]*p[4]*p[6] == 0){
                             img[y * w + x] = -2;
                             deleted=1;
+                        }else{
+                			tmp_limits[2*y] = (tmp_limits[2*y] > x)? x: tmp_limits[2*y];
+                    		tmp_limits[2*y+1] = (tmp_limits[2*y+1] < x)? x: tmp_limits[2*y+1];
                         }
                     }else{
                         if(a == 1 && b >= 5 && b <= 7 && p[0]*p[2]*p[6] == 0 && p[0]*p[4]*p[6] == 0){
-                            img[y * w + x] = -2;
+                            img[y * w + x] = -3;
                             deleted=1;
+                        }else{
+                			tmp_limits[2*y] = (tmp_limits[2*y] > x)? x: tmp_limits[2*y];
+                    		tmp_limits[2*y+1] = (tmp_limits[2*y+1] < x)? x: tmp_limits[2*y+1];
                         }
                     }
                 }
-                //printf("%d\n", img[y * w + x]);
             }
         }
-        //printf("%d\n", deleted);
 
         if(deleted == 0)
             break;
-        else
+        else{
             pass = (pass == 0)?1:0;
-
-        for(y = 0; y < h; y++){
-            for(x = limits[2*y]; x < limits[2*y+1]+1; x++){
-                if(img[y * w + x] == -2){
-                    img[y * w + x] = 0;
-                }else if(img[y * w + x] != 0){
-                    tmp_limits[2*y] = (tmp_limits[2*y] > x)? x: tmp_limits[2*y];
-                    tmp_limits[2*y+1] = (tmp_limits[2*y+1] < x)? x: tmp_limits[2*y+1];
-                }
-            }
+            delete = (delete == -2)?-3:-2;
         }
-
     }while(deleted > 0);
 
     free(limits);
