@@ -105,7 +105,7 @@ void* processLoop(void* arg){
 			}
 			
 			//Thin shapes to get lines and update texture
-			thinning(depthBool);
+			thinning2(depthBool);
 			if(viewMode == 2){
 				pthread_mutex_lock(&gl_backbuf_mutex);
 				int i;

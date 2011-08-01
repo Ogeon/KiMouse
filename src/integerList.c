@@ -59,6 +59,8 @@ void IntegerListInsertFirst(IntegerList* list, int value){
 	IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
 	new->value = value;
 	new->next = list->start;
+	if(list->end == NULL)
+		list->end = new;
 	list->start = new;
 	list->size ++;
 }
@@ -67,7 +69,11 @@ void IntegerListInsertLast(IntegerList* list, int value){
 	IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
 	new->value = value;
 	new->next = NULL;
-	list->end->next = new;
+	if(list->end == NULL){
+		list->start = new;
+	}else{
+		list->end->next = new;
+	}
 	list->end = new;
 	list->size ++;
 }
