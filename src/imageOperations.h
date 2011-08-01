@@ -22,5 +22,7 @@ void laplace(uint16_t* source, char* dest, uint16_t treshold);
 
 void thinning(char *img);
 
+void thinning2(char *img);
+
 void flood_fill(char *img, char value, long int position);
 

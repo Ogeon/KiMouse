@@ -1,4 +1,4 @@
-OBJECTS = build/main.o build/imageOperations.o
+OBJECTS = build/main.o build/imageOperations.o build/integerList.o
 CC = gcc
 INCLUDES = -Ilibs/libfreenect/include -Ilibs/glfw/include
 LINKS = -lfreenect -lGL -lGLU -lm libs/glfw/lib/x11/libglfw.a
@@ -48,3 +48,6 @@ build/main.o: src/main.c
 	
 build/imageOperations.o: src/imageOperations.c src/imageOperations.h
 	$(OBUILD) src/imageOperations.c -o build/imageOperations.o
+	
+build/integerList.o: src/integerList.c src/integerList.h
+	$(OBUILD) src/integerList.c -o build/integerList.o

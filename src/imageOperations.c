@@ -18,6 +18,8 @@
  
 #include "imageOperations.h"
 
+#include "integerList.h"
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
@@ -204,6 +206,10 @@ void thinning(char *img){
 
     free(limits);
     free(tmp_limits);
+}
+
+void thinning2(char *img){
+
 }
 
 
