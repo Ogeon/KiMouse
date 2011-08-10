@@ -223,7 +223,6 @@ void thinning2(char *img){
 	IntegerList* removeList = IntegerListCreate(1, 1);
 	
 	for(y = 0; y < h; y++){
-		//printf("Examine row %d\n", y);
 		for(x = 0; x < w; x++){
 			i = y*w+x;
 			if(img[i] != 0){
@@ -242,10 +241,7 @@ void thinning2(char *img){
 	}
 	
 	IntegerList* temp;
-	int counter = 0;
 	do{
-		/*printf("Removing layer %d\n", ++counter);
-		printf("Size of lookAt = %d\n", lookAt->size);*/
 		while(removeList->size > 0){
 			int i = IntegerListRemoveFirst(removeList);
 			img[i] = 0;
