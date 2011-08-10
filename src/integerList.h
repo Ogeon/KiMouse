@@ -15,6 +15,10 @@
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#ifndef INTEGER_LIST
+#define INTEGER_LIST 
+ 
 typedef struct IntegerListElement{
 	int value;
 	struct IntegerListElement* next;
@@ -47,3 +51,5 @@ int IntegerListRemoveFirst(IntegerList* list);
 int IntegerListRemoveLast(IntegerList* list);
 
 void IntegerListDestroy(IntegerList* list);
+
+#endif

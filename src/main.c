@@ -66,6 +66,7 @@ void resetBackground(){
 }
 
 void* processLoop(void* arg){
+	int counter = 0;
 	while(running == 1 && freenect_process_events(f_ctx) >= 0){
 		if(glfwGetKey('B')){
 			resetBackground();
@@ -82,7 +83,9 @@ void* processLoop(void* arg){
 			viewMode = 2;
 		}
 		
-		if(depthReceived){
+		if(depthReceived && ++counter > 10){
+			counter = 0;
+			
 			//Swap buffers
 			uint16_t* tmp = depthBack;
 			depthBack = depthFront;
@@ -355,7 +358,7 @@ int main(int argc, char **argv){
 	
 	printf("\nHello!\n\n");
 	freenect_set_tilt_degs(f_dev, 0);
-	sleep(1);
+	sleep(2);
 	
 	depthRGBReceived = 0;
 	depthReceived = 0;
@@ -363,6 +366,7 @@ int main(int argc, char **argv){
 	
 	depthRGBBack = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
 	depthRGBFront = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
+	depthFront = (uint16_t*)malloc(FREENECT_FRAME_PIX * sizeof(uint16_t));
 	depthReject = (uint16_t*)malloc(FREENECT_FRAME_PIX * sizeof(uint16_t));
 	resetBackground();
 	depthBool = (char*)malloc(FREENECT_FRAME_PIX);
@@ -375,7 +379,7 @@ int main(int argc, char **argv){
 	        FREENECT_DEPTH_11BIT)
 	    );
 	freenect_start_depth(f_dev);
-		
+	resetBackground();
 	running = 1;
 	
 	printf("Creating worker thread... ");
@@ -436,6 +440,7 @@ int main(int argc, char **argv){
 	printf("Freeing resources...\n");
 	free(depthRGBBack);
 	free(depthRGBFront);
+	free(depthFront);
 	free(depthReject);
 	free(depthBool);
 

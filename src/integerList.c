@@ -19,6 +19,7 @@
 #include "integerList.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 
 IntegerList* IntegerListCreate(int sorted, int uniqueValue){
 	IntegerList* list = (IntegerList*)malloc(sizeof(IntegerList));
@@ -35,37 +36,98 @@ IntegerList* IntegerListCreate(int sorted, int uniqueValue){
 }
 
 void IntegerListInsert(IntegerList* list, int position, int value){
-	if(position >= list->size){
-		IntegerListInsertLast(list, value);
-	}else if(position < 1){
-		IntegerListInsertFirst(list, value);
+	if(list->sorted){
+			IntegerListInsertFirst(list, value);
 	}else{
-		IntegerListElement* prev = list->start;
-		IntegerListElement* next = prev->next;
-		int i = 0;
-		while(++i < position){
-			prev = next;
-			next = next->next;
+		if(list->uniqueValue)
+			if(IntegerListContains(list, value))
+				return;
+
+		if(position >= list->size){
+			IntegerListInsertLast(list, value);
+		}else if(position < 1){
+			IntegerListInsertFirst(list, value);
+		}else{
+			IntegerListElement* prev = list->start;
+			IntegerListElement* next = prev->next;
+			int i = 0;
+			while(++i < position){
+				prev = next;
+				next = next->next;
+			}
+			IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
+			new->value = value;
+			new->next = next;
+			prev->next = new;
+			list->size ++;
 		}
-		IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
-		new->value = value;
-		new->next = next;
-		prev->next = new;
-		list->size ++;
 	}
 }
 
 void IntegerListInsertFirst(IntegerList* list, int value){
-	IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
-	new->value = value;
-	new->next = list->start;
-	if(list->end == NULL)
-		list->end = new;
-	list->start = new;
+	if(list->sorted){
+		if(list->start == NULL){
+			IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
+			new->value = value;
+			new->next = list->start;
+			list->end = new;
+			list->start = new;
+		}else if((list->start->value > value && list->uniqueValue) || 
+				(list->start->value >= value && !list->uniqueValue)){
+			IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
+			new->value = value;
+			new->next = list->start;
+			if(list->end == NULL)
+				list->end = new;
+			list->start = new;
+		}else{
+			IntegerListElement* element = list->start;
+			IntegerListElement* prev;
+			
+			while(element != NULL){
+				if(element->value < value){
+					prev = element;
+					element = element->next;
+				}else
+					break;
+			}
+			
+			if(element == NULL){
+				IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
+				new->value = value;
+				new->next = NULL;
+				list->end->next = new;
+				list->end = new;
+			}else if((element->value > value && list->uniqueValue) || 
+				(element->value >= value && !list->uniqueValue)){
+				IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
+				new->value = value;
+				new->next = element;
+				prev->next = new;
+			}else{
+				return;
+			}
+		}
+	}else{
+		if(list->uniqueValue)
+			if(IntegerListContains(list, value))
+				return;
+
+		IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
+		new->value = value;
+		new->next = list->start;
+		if(list->end == NULL)
+			list->end = new;
+		list->start = new;
+	}
 	list->size ++;
 }
 
 void IntegerListInsertLast(IntegerList* list, int value){
+	if(list->uniqueValue)
+		if(IntegerListContains(list, value))
+			return;
+
 	IntegerListElement* new = (IntegerListElement*)malloc(sizeof(IntegerListElement));
 	new->value = value;
 	new->next = NULL;
@@ -156,6 +218,8 @@ int IntegerListRemoveFirst(IntegerList* list){
 		IntegerListElement* element = list->start;
 		int value = element->value;
 		list->start = element->next;
+		if(list->start == NULL)
+			list->end = NULL;
 		free(element);
 		list->size --;
 		return value;

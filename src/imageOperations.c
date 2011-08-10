@@ -21,6 +21,7 @@
 #include "integerList.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <math.h>
 
@@ -209,89 +210,157 @@ void thinning(char *img){
 }
 
 void thinning2(char *img){
-	int deleted, pass = 0;
+	int pass = 1;
 	int x, y;
 	int w = FREENECT_FRAME_W;
 	int h = FREENECT_FRAME_H;
 	
-	int a, b, i, n, n2;
+	int a, b, i;
 	int p[8];
 	
-	IntegerList* lookAt = IntegerListCreate(0, 0);
-	IntegerList* removeList = IntegerListCreate(0, 0);
+	IntegerList* lookAt = IntegerListCreate(1, 1);
+	IntegerList* lookAtNext = IntegerListCreate(1, 1);
+	IntegerList* removeList = IntegerListCreate(1, 1);
 	
 	for(y = 0; y < h; y++){
+		//printf("Examine row %d\n", y);
 		for(x = 0; x < w; x++){
-			if(img[y*w+x] != 0){
-				i = y*w+x;
-				a = 0;
-				b = 0;
-				
-				for(n = 0; n < 8; n++)
-					p[n] = 0;
-				
-				if(y > 0){
-					p[0] = (img[i-w] != 0)?1:0;
-
-					if(x > 0){
-						p[7] = (img[i-w-1] != 0)?1:0;
-					}
-
-					if(x < w-1){
-						p[1] = (img[i-w+1] != 0)?1:0;
-					}
-				}
-
-				if(y < h-1){
-					p[4] = (img[i+w] != 0)?1:0;
-
-					if(x > 0){
-						p[5] = (img[i+w-1] != 0)?1:0;
-					}
-
-					if(x < w-1){
-						p[3] = (img[i+w+1] != 0)?1:0;
-					}
-				}
-
-				if(x > 0){
-					p[6] = (img[i+1] != 0)?1:0;
-				}
-
-				if(x < w-1){
-					p[2] = (img[i-1] != 0)?1:0;
-				}
-				
-				for(n = 0; n < 8; n++){
-					n2 = (n+1)%8;
-					b+=p[n];
-					if(p[n] == 1 && p[n2] == 0)
-						a++;
-				}
+			i = y*w+x;
+			if(img[i] != 0){
+				thinningGetNeighbourInfo(i, img, p, &a, &b);
 				
 				if(b >= 4 && b <= 7 && a == 1){
 					if(p[0]*p[2]*p[4] == 0 && p[2]*p[4]*p[6] == 0){
-						IntegerListInsertLast(removeList, y*w+x);
+						IntegerListInsertLast(removeList, i);
+						thinningAddNeighbours(i, p, lookAtNext);
 					}else{
-						IntegerListInsertLast(lookAt, y*w+x);
+						IntegerListInsertLast(lookAtNext, i);
 					}
 				}
 			}
 		}
 	}
 	
-	while(lookAt->size > 0){
-		int i = IntegerListRemoveFirst(lookAt);
-		img[i] = 127;
-	}
-	
-	while(removeList->size > 0){
-		int i = IntegerListRemoveFirst(removeList);
-		img[i] = 0;
-	}
+	IntegerList* temp;
+	int counter = 0;
+	do{
+		/*printf("Removing layer %d\n", ++counter);
+		printf("Size of lookAt = %d\n", lookAt->size);*/
+		while(removeList->size > 0){
+			int i = IntegerListRemoveFirst(removeList);
+			img[i] = 0;
+		}
+		
+		temp = lookAt;
+		lookAt = lookAtNext;
+		lookAtNext = temp;
+		
+		pass = pass==1?0:1;
+		
+		while(lookAt->size > 0){
+			i = IntegerListRemoveFirst(lookAt);
+			
+			if(img[i] != 0){
+				thinningGetNeighbourInfo(i, img, p, &a, &b);
+				if(b >= 4 && b <= 7 && a == 1){
+					if(pass == 0){
+						if(p[0]*p[2]*p[4] == 0 && p[2]*p[4]*p[6] == 0){
+							IntegerListInsertLast(removeList, i);
+							thinningAddNeighbours(i, p, lookAtNext);
+						}else{
+							IntegerListInsertLast(lookAtNext, i);
+						}
+					}else{
+						if(b >= 5 && p[0]*p[2]*p[6] == 0 && p[0]*p[4]*p[6] == 0){
+							IntegerListInsertLast(removeList, i);
+							thinningAddNeighbours(i, p, lookAtNext);
+						}else{
+							IntegerListInsertLast(lookAtNext, i);
+						}
+					}
+				}
+			}
+		}
+	}while(removeList->size > 0);
 	
 	IntegerListDestroy(lookAt);
+	IntegerListDestroy(lookAtNext);
 	IntegerListDestroy(removeList);
+}
+
+void thinningAddNeighbours(int i, int*p, IntegerList*list){
+	int w = FREENECT_FRAME_W;
+	if(p[0])
+		IntegerListInsertLast(list, i-w);
+	if(p[1])
+		IntegerListInsertLast(list, i-w+1);
+	if(p[2])
+		IntegerListInsertLast(list, i+1);
+	if(p[3])
+		IntegerListInsertLast(list, i+w+1);
+	if(p[4])
+		IntegerListInsertLast(list, i+w);
+	if(p[5])
+		IntegerListInsertLast(list, i+w-1);
+	if(p[6])
+		IntegerListInsertLast(list, i-1);
+	if(p[7])
+		IntegerListInsertLast(list, i-w-1);
+}
+
+void thinningGetNeighbourInfo(int i, char*img, int*p, int*ap, int*bp){
+	int w = FREENECT_FRAME_W;
+	int h = FREENECT_FRAME_H;
+	int y = i/w;
+	int x = i-y*w;
+	int a = 0;
+	int b = 0;
+	int n, n2;
+	
+	for(n = 0; n < 8; n++)
+		p[n] = 0;
+	
+	if(y > 0){
+		p[0] = (img[i-w] != 0)?1:0;
+
+		if(x > 0){
+			p[7] = (img[i-w-1] != 0)?1:0;
+		}
+
+		if(x < w-1){
+			p[1] = (img[i-w+1] != 0)?1:0;
+		}
+	}
+
+	if(y < h-1){
+		p[4] = (img[i+w] != 0)?1:0;
+
+		if(x > 0){
+			p[5] = (img[i+w-1] != 0)?1:0;
+		}
+
+		if(x < w-1){
+			p[3] = (img[i+w+1] != 0)?1:0;
+		}
+	}
+
+	if(x > 0){
+		p[6] = (img[i-1] != 0)?1:0;
+	}
+
+	if(x < w-1){
+		p[2] = (img[i+1] != 0)?1:0;
+	}
+	
+	for(n = 0; n < 8; n++){
+		n2 = (n+1)%8;
+		b+=p[n];
+		if(p[n] == 1 && p[n2] == 0)
+			a++;
+	}
+	
+	*ap = a;
+	*bp = b;
 }
 
 
