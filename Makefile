@@ -5,7 +5,7 @@ LINKS = -lfreenect -lGL -lGLU -lm libs/glfw-2.7/lib/x11/libglfw.a -lXrandr
 
 #### FLAGS ####
 #Allways provided:
-CFLAGS = -Wall
+CFLAGS = -Wall -O3
 
 #Provided when building .o-files:
 OFLAGS = -c

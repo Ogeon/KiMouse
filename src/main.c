@@ -366,7 +366,6 @@ int main(int argc, char **argv){
 	
 	depthRGBBack = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
 	depthRGBFront = (uint8_t*)malloc(FREENECT_FRAME_PIX * 3);
-	depthFront = (uint16_t*)malloc(FREENECT_FRAME_PIX * sizeof(uint16_t));
 	depthReject = (uint16_t*)malloc(FREENECT_FRAME_PIX * sizeof(uint16_t));
 	resetBackground();
 	depthBool = (char*)malloc(FREENECT_FRAME_PIX);
@@ -440,7 +439,6 @@ int main(int argc, char **argv){
 	printf("Freeing resources...\n");
 	free(depthRGBBack);
 	free(depthRGBFront);
-	//free(depthFront);
 	free(depthReject);
 	free(depthBool);
 
