@@ -19,12 +19,13 @@
 #include <stdint.h>
 #include "integerList.h"
 
+#define FREENECT_FRAME_PIX	640*480
+#define FREENECT_FRAME_W	640
+#define FREENECT_FRAME_H	480
+
 void laplace(uint16_t* source, char* dest, uint16_t treshold);
 
 void thinning(char *img);
-
-void thinning2(char *img);
-void thinningAddNeighbours(int i, int*p, IntegerList*list);
 void thinningGetNeighbourInfo(int i, char*img, int*p, int*ap, int*bp);
 
 void flood_fill(char *img, char value, long int position);

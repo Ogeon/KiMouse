@@ -18,16 +18,10 @@
  
 #include "imageOperations.h"
 
-#include "integerList.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
-
-#define FREENECT_FRAME_PIX	640*480
-#define FREENECT_FRAME_W	640
-#define FREENECT_FRAME_H	480
 
 void laplace(uint16_t* source, char* dest, uint16_t treshold){
 	int x, y;
@@ -83,6 +77,8 @@ void thinning(char *img){
 	int a, b, n;
 	int p[8];
 	
+	char done = 0;
+	
 	int index;
 	
 	for(y = 0; y < h; y++){
@@ -105,70 +101,11 @@ void thinning(char *img){
 			for(x = limits[2*y]; x < limits[2*y+1]+1; x++){
 				index = y * w + x;
 				if(img[index] != 0){
-					a = 0;
-					b = 0;
-
-					if(y > 0){
-						p[0] = (img[index-w] != 0)?1:0;
-
-						if(x > 0){
-							p[7] = (img[index-w-1] != 0)?1:0;
-						}else{
-							p[7] = 0;
-						}
-
-						if(x < w-1){
-							p[1] = (img[index-w+1] != 0)?1:0;
-						}else{
-							p[1] = 0;
-						}
-					}else{
-						p[7] = 0;
-						p[0] = 0;
-						p[1] = 0;
-					}
-
-					if(y < h-1){
-						p[4] = (img[index+w] != 0)?1:0;
-
-						if(x > 0){
-							p[5] = (img[index+w-1] != 0)?1:0;
-						}else{
-							p[5] = 0;
-						}
-
-						if(x < w-1){
-							p[3] = (img[index+w+1] != 0)?1:0;
-						}else{
-							p[3] = 0;
-						}
-					}else{
-						p[3] = 0;
-						p[4] = 0;
-						p[5] = 0;
-					}
-
-					if(x > 0){
-						p[6] = (img[index-1] != 0)?1:0;
-					}else{
-						p[6] = 0;
-					}
-
-					if(x < w-1){
-						p[2] = (img[index+1] != 0)?1:0;
-					}else{
-						p[2] = 0;
-					}
-
-					for(n = 0; n < 8; n++){
-						int n2 = (n+1)%8;
-						b+=p[n];
-						if(p[n] == 1 && p[n2] == 0)
-							a++;
-					}
-					if(a == 1 && b <= 7 && b >= 4){
+					thinningGetNeighbourInfo(index, img, p, &a, &b);
+					
+					if(a == 1 && b <= 7 && b >= 2){
 					if(pass == 0){
-						if(p[0]*p[2]*p[4] == 0 && p[2]*p[4]*p[6] == 0){
+						if(b >= 4 && p[0]*p[2]*p[4] == 0 && p[2]*p[4]*p[6] == 0){
 							img[index] = -2;
 							deleted=1;
 						}else{
@@ -176,7 +113,7 @@ void thinning(char *img){
 							tmp_limits[2*y+1] = (tmp_limits[2*y+1] < x)? x: tmp_limits[2*y+1];
 						}
 					}else{
-						if(b >= 5 && p[0]*p[2]*p[6] == 0 && p[0]*p[4]*p[6] == 0){
+						if(b <= 6 && p[0]*p[2]*p[6] == 0 && p[0]*p[4]*p[6] == 0){
 							img[index] = -2;
 							deleted=1;
 						}else{
@@ -193,7 +130,8 @@ void thinning(char *img){
 		}
 
 		if(deleted == 0)
-			break;
+			if(++done == 2)
+				break;
 		
 		pass = (pass == 0)?1:0;
 		
@@ -202,105 +140,10 @@ void thinning(char *img){
 				img[n] = 0;
 		}
 		
-	}while(deleted > 0 && ++passes < 40);
+	}while(deleted > 0);
 
 	free(limits);
 	free(tmp_limits);
-}
-
-void thinning2(char *img){
-	int pass = 1, passes = 0;
-	int x, y;
-	int w = FREENECT_FRAME_W;
-	int h = FREENECT_FRAME_H;
-	
-	int a, b, i;
-	int p[8];
-	
-	IntegerList* lookAt = IntegerListCreate(1, 1);
-	IntegerList* lookAtNext = IntegerListCreate(1, 1);
-	IntegerList* removeList = IntegerListCreate(1, 1);
-	
-	for(y = 0; y < h; y++){
-		for(x = 0; x < w; x++){
-			i = y*w+x;
-			if(img[i] != 0){
-				thinningGetNeighbourInfo(i, img, p, &a, &b);
-				
-				if(b >= 4 && b <= 7 && a == 1){
-					if(p[0]*p[2]*p[4] == 0 && p[2]*p[4]*p[6] == 0){
-						IntegerListInsertLast(removeList, i);
-						thinningAddNeighbours(i, p, lookAtNext);
-					}else{
-						IntegerListInsertLast(lookAtNext, i);
-					}
-				}
-			}
-		}
-	}
-	
-	IntegerList* temp;
-	do{
-		while(removeList->size > 0){
-			int i = IntegerListRemoveFirst(removeList);
-			img[i] = 0;
-		}
-		
-		temp = lookAt;
-		lookAt = lookAtNext;
-		lookAtNext = temp;
-		
-		pass = pass==1?0:1;
-		
-		while(lookAt->size > 0){
-			i = IntegerListRemoveFirst(lookAt);
-			
-			if(img[i] != 0){
-				thinningGetNeighbourInfo(i, img, p, &a, &b);
-				if(b >= 4 && b <= 7 && a == 1){
-					if(pass == 0){
-						if(p[0]*p[2]*p[4] == 0 && p[2]*p[4]*p[6] == 0){
-							IntegerListInsertLast(removeList, i);
-							thinningAddNeighbours(i, p, lookAtNext);
-						}else{
-							IntegerListInsertLast(lookAtNext, i);
-						}
-					}else{
-						if(b >= 5 && p[0]*p[2]*p[6] == 0 && p[0]*p[4]*p[6] == 0){
-							IntegerListInsertLast(removeList, i);
-							thinningAddNeighbours(i, p, lookAtNext);
-						}else{
-							IntegerListInsertLast(lookAtNext, i);
-						}
-					}
-				}
-			}
-		}
-	}while(removeList->size > 0);
-	
-	IntegerListDestroy(lookAt);
-	IntegerListDestroy(lookAtNext);
-	IntegerListDestroy(removeList);
-}
-
-void thinningAddNeighbours(int i, int*p, IntegerList*list){
-	int w = FREENECT_FRAME_W;
-	if(p[0])
-		IntegerListInsertLast(list, i-w);
-	if(p[1])
-		IntegerListInsertLast(list, i-w+1);
-	if(p[2])
-		IntegerListInsertLast(list, i+1);
-	if(p[3])
-		IntegerListInsertLast(list, i+w+1);
-	if(p[4])
-		IntegerListInsertLast(list, i+w);
-	if(p[5])
-		IntegerListInsertLast(list, i+w-1);
-	if(p[6])
-		IntegerListInsertLast(list, i-1);
-	if(p[7])
-		IntegerListInsertLast(list, i-w-1);
 }
 
 void thinningGetNeighbourInfo(int i, char*img, int*p, int*ap, int*bp){
@@ -308,9 +151,7 @@ void thinningGetNeighbourInfo(int i, char*img, int*p, int*ap, int*bp){
 	int h = FREENECT_FRAME_H;
 	int y = i/w;
 	int x = i-y*w;
-	int a = 0;
-	int b = 0;
-	int n, n2;
+	int n, n2, a=0, b=0;
 	
 	for(n = 0; n < 8; n++)
 		p[n] = 0;

@@ -111,11 +111,40 @@ void* processLoop(void* arg){
 			thinning(depthBool);
 			if(viewMode == 2){
 				pthread_mutex_lock(&gl_backbuf_mutex);
-				int i;
+				int i, n;
 				for (i=0; i<FREENECT_FRAME_PIX; i++) {
-					depthRGBBack[3*i+0] = depthBool[i];
-					depthRGBBack[3*i+1] = depthBool[i];
-					depthRGBBack[3*i+2] = depthBool[i];
+					if(depthBool[i]!=0){
+						n = countNeighbours(depthBool, i);
+						switch(n){
+							case(1):
+							depthRGBBack[3*i+0] = 0;
+							depthRGBBack[3*i+1] = depthBool[i];
+							depthRGBBack[3*i+2] = depthBool[i];	
+							break;
+							
+							case(2):
+							depthRGBBack[3*i+0] = 0;
+							depthRGBBack[3*i+1] = depthBool[i];
+							depthRGBBack[3*i+2] = 0;	
+							break;
+							
+							case(3):
+							case(4):
+							depthRGBBack[3*i+0] = depthBool[i];
+							depthRGBBack[3*i+1] = 0;
+							depthRGBBack[3*i+2] = 0;	
+							break;
+							
+							default:
+							depthRGBBack[3*i+0] = depthBool[i];
+							depthRGBBack[3*i+1] = depthBool[i];
+							depthRGBBack[3*i+2] = depthBool[i];	
+						}
+					}else{
+						depthRGBBack[3*i+0] = 0;
+						depthRGBBack[3*i+1] = 0;
+						depthRGBBack[3*i+2] = 0;
+					}
 				}
     			depthRGBReceived++;
     			pthread_cond_signal(&gl_frame_cond);
@@ -125,6 +154,50 @@ void* processLoop(void* arg){
 	}
 	return NULL;
 }
+
+int countNeighbours(char* img, int i){
+	int w = FREENECT_FRAME_W;
+	int h = FREENECT_FRAME_H;
+	int y = i/w;
+	int x = i-y*w;
+	int n = 0;
+	int color = img[i];
+	
+	if(y > 0){
+		n += (img[i-w] == color)?1:0;
+
+		if(x > 0){
+			n += (img[i-w-1] == color)?1:0;
+		}
+
+		if(x < w-1){
+			n += (img[i-w+1] == color)?1:0;
+		}
+	}
+
+	if(y < h-1){
+		n += (img[i+w] == color)?1:0;
+
+		if(x > 0){
+			n += (img[i+w-1] == color)?1:0;
+		}
+
+		if(x < w-1){
+			n += (img[i+w+1] == color)?1:0;
+		}
+	}
+
+	if(x > 0){
+		n += (img[i-1] == color)?1:0;
+	}
+
+	if(x < w-1){
+		n += (img[i+1] == color)?1:0;
+	}
+	
+	return n;
+}
+
 
 void depthCB(freenect_device *dev, void *v_depth, uint32_t timestamp){
 	int i;
