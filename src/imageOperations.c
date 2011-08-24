@@ -203,14 +203,14 @@ void thinning(char *img){
 			pass = (pass == 0)?1:0;
 			delete = (delete == -2)?-3:-2;
 		}
-	}while(deleted > 0 && ++passes < 10);
+	}while(deleted > 0 && ++passes < 15);
 
 	free(limits);
 	free(tmp_limits);
 }
 
 void thinning2(char *img){
-	int pass = 1;
+	int pass = 1, passes = 0;
 	int x, y;
 	int w = FREENECT_FRAME_W;
 	int h = FREENECT_FRAME_H;

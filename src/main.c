@@ -108,7 +108,7 @@ void* processLoop(void* arg){
 			}
 			
 			//Thin shapes to get lines and update texture
-			thinning2(depthBool);
+			thinning(depthBool);
 			if(viewMode == 2){
 				pthread_mutex_lock(&gl_backbuf_mutex);
 				int i;
@@ -440,7 +440,7 @@ int main(int argc, char **argv){
 	printf("Freeing resources...\n");
 	free(depthRGBBack);
 	free(depthRGBFront);
-	free(depthFront);
+	//free(depthFront);
 	free(depthReject);
 	free(depthBool);
 
