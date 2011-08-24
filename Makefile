@@ -1,7 +1,7 @@
 OBJECTS = build/main.o build/imageOperations.o build/integerList.o
 CC = gcc
-INCLUDES = -Ilibs/libfreenect/include -Ilibs/glfw/include
-LINKS = -lfreenect -lGL -lGLU -lm libs/glfw/lib/x11/libglfw.a
+INCLUDES = -Ilibs/libfreenect/include -Ilibs/glfw-2.7/include
+LINKS = -lfreenect -lGL -lGLU -lm libs/glfw-2.7/lib/x11/libglfw.a -lXrandr
 
 #### FLAGS ####
 #Allways provided:

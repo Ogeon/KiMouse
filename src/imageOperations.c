@@ -72,7 +72,7 @@ void laplace(uint16_t* source, char* dest, uint16_t treshold){
 
 
 void thinning(char *img){
-	int deleted, pass = 0;
+	int deleted, pass = 0, passes = 0;
 	int x, y;
 	int w = FREENECT_FRAME_W;
 	int h = FREENECT_FRAME_H;
@@ -203,7 +203,7 @@ void thinning(char *img){
 			pass = (pass == 0)?1:0;
 			delete = (delete == -2)?-3:-2;
 		}
-	}while(deleted > 0);
+	}while(deleted > 0 && ++passes < 10);
 
 	free(limits);
 	free(tmp_limits);
